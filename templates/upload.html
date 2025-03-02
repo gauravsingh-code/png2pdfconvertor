@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PNG to PDF Converter</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 600px;
+            margin-top: 50px;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+        #drop-area {
+            border: 2px dashed #007bff;
+            padding: 30px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        #drop-area:hover {
+            background-color: #e9ecef;
+        }
+        .hidden {
+            display: none;
+        }
+        .loader {
+            display: none;
+            margin-top: 20px;
+        }
+        .success-message {
+            display: none;
+            margin-top: 20px;
+            color: green;
+            font-weight: bold;
+            animation: fadeIn 1s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .quote-container {
+            width: 60%;
+            padding: 30px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.8);
+            box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.2);
+            transition: all 0.5s ease;
+        }
+        .quote-text {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            transition: all 0.5s ease;
+        }
+        .quote-author {
+            font-size: 20px;
+            font-weight: 400;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2 class="mb-4">🎉 PNG to PDF Converter 🎉</h2>
+
+    <div id="drop-area">
+        <p>Drag & Drop PNG files here or</p>
+        <input type="file" id="fileInput" multiple class="form-control hidden" accept="image/png">
+        <button class="btn btn-primary mt-2" onclick="document.getElementById('fileInput').click();">Select Files</button>
+    </div>
+
+    <!-- File List -->
+    <ul id="file-list" class="list-group mt-3"></ul>
+
+    <form id="upload-form">
+        <button type="submit" id="convert-btn" class="btn btn-success mt-3" disabled>Convert to PDF</button>
+    </form>
+
+    <!-- Loader -->
+    <div class="loader" id="loading-spinner">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="mt-2">Processing... Please wait ⏳</p>
+    </div>
+
+    <!-- Success Message -->
+    <p id="success-message" class="success-message">🎉 Your PDF is ready! Enjoy your beautifully converted file! 🎉</p>
+
+    <!-- Download Button -->
+    <a id="download-btn" class="btn btn-warning mt-3 hidden" href="#" download="converted.pdf">Download PDF</a>
+
+    <div id="quote-container" class="text-center p-3">
+        <blockquote id="quote-text" class="blockquote">"Loading quote..."</blockquote>
+        <footer id="quote-author" class="blockquote-footer">Please wait...</footer>
+    </div>
+    
+</div>
+
+<script>
+
+    let fileInput = document.getElementById('fileInput');
+    let fileList = document.getElementById('file-list');
+    let uploadForm = document.getElementById("upload-form");
+    let convertBtn = document.getElementById("convert-btn");
+    let loader = document.getElementById("loading-spinner");
+    let downloadBtn = document.getElementById("download-btn");
+    let successMessage = document.getElementById("success-message");
+
+    fileInput.addEventListener("change", function() {
+        fileList.innerHTML = "";  // Clear previous files
+        let files = [...fileInput.files];
+
+        if (files.length === 0) {
+            convertBtn.disabled = true;
+            return;
+        }
+
+        files.forEach(file => {
+            if (file.type !== "image/png") {
+                alert("Only PNG files are allowed!");
+                fileInput.value = ""; // Clear invalid input
+                return;
+            }
+
+            let li = document.createElement("li");
+            li.textContent = file.name;
+            li.classList.add("list-group-item");
+            fileList.appendChild(li);
+        });
+
+        convertBtn.disabled = false; // Enable convert button
+    });
+
+    uploadForm.addEventListener("submit", function (event) {
+        event.preventDefault(); 
+
+        if (fileInput.files.length === 0) {
+            alert("Please upload at least one PNG file before converting.");
+            return;
+        }
+
+        let formData = new FormData();
+        for (let file of fileInput.files) {
+            formData.append("file", file);
+        }
+
+        convertBtn.style.display = "none";
+        loader.style.display = "block";
+        downloadBtn.style.display = "none";
+        successMessage.style.display = "none";
+
+        fetch("/convert", {
+            method: "POST",
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error("Conversion failed!");
+            }
+            return response.blob();
+        })
+        .then(blob => {
+            loader.style.display = "none";
+            convertBtn.style.display = "block";
+            downloadBtn.style.display = "block";
+            successMessage.style.display = "block";
+
+            let url = window.URL.createObjectURL(blob);
+            downloadBtn.href = url;
+        })
+        .catch(error => {
+            console.error("Error:", error);
+            alert("Conversion failed! Please try again.");
+            loader.style.display = "none";
+            convertBtn.style.display = "block";
+        });
+    });
+
+    async function fetchQuote() {
+    try {
+        // const response = await fetch("quotes.json"); // Load local JSON file
+        const response = await fetch("{{ url_for('static', filename='quotes.json') }}");
+        const quotes = await response.json();
+        
+        // console.log("Data: ", response);
+        // console.log("quotes: ", quotes);
+        // Get a random quote
+        const randomIndex = Math.floor(Math.random() * quotes.length);
+        const randomQuote = quotes[randomIndex];
+
+        document.getElementById("quote-text").innerText = `"${randomQuote.quote}"`;
+        document.getElementById("quote-author").innerText = `- ${randomQuote.author}`;
+    } catch (error) {
+        console.error("Fetch error:", error);
+    }
+}
+
+// Show a new quote every 50 seconds
+setInterval(fetchQuote, 20000);
+fetchQuote();
+ 
+
+
+
+
+//     async function fetchQuote() {
+//     try {
+//         // const response = await fetch("https://api.quotable.io/random");
+//         // const response = await fetch("https://api.quotable.dev/random");
+//         const response = await fetch("https://cors-anywhere.herokuapp.com/https://zenquotes.io/api/random");
+//         // const response = await fetch("https://type.fit/api/quotes");
+//         const data = await response.json();
+        
+//         console.log("API response : ", response);
+//         console.log("Data : ", data);
+//         console.log(data[0].q);
+//         console.log(data[0].a);
+//         document.getElementById("quote-text").innerText = `"${data[0].q}"`;
+//         document.getElementById("quote-author").innerText = `- ${data[0].a}`;
+//     } catch (error) {
+//         console.error("Error fetching quote:", error);
+//         document.getElementById("quote-text").innerText = `"Failed to load quote. Please try again later."`;
+//         document.getElementById("quote-author").innerText = "";
+//     }
+// }
+
+// // Fetch a new quote every 50 seconds (50000 ms)
+// setInterval(fetchQuote, 20000);
+
+// // Load the first quote immediately
+// fetchQuote();
+
+// const fonts = [
+//             "Pacifico, cursive",
+//             "Indie Flower, cursive",
+//             "Caveat, cursive",
+//             "Permanent Marker, cursive",
+//             "Roboto, sans-serif"
+//         ];
+
+//         async function fetchQuote() {
+//             try {
+//                 // const response = await fetch("https://api.quotable.io/random");
+//          // const response = await fetch("https://api.quotable.dev/random");
+//         const response = await fetch("https://cors-anywhere.herokuapp.com/https://zenquotes.io/api/random");
+//         // const response = await fetch("https://type.fit/api/quotes");
+//                 const data = await response.json();
+
+//                 const quoteText = document.getElementById("quote-text");
+//                 const quoteAuthor = document.getElementById("quote-author");
+
+//                 // Apply random font
+//                 const randomFont = fonts[Math.floor(Math.random() * fonts.length)];
+//                 quoteText.style.fontFamily = randomFont;
+//                 quoteAuthor.style.fontFamily = randomFont;
+
+//                 // Apply fade effect
+//                 quoteText.classList.remove("show");
+//                 quoteAuthor.classList.remove("show");
+
+//                 setTimeout(() => {
+//                     quoteText.innerText = `"${data.content}"`;
+//                     quoteAuthor.innerText = `- ${data.author}`;
+                    
+//                     quoteText.classList.add("show");
+//                     quoteAuthor.classList.add("show");
+//                 }, 300);
+//             } catch (error) {
+//                 console.error("Error fetching quote:", error);
+//                 document.getElementById("quote-text").innerText = `"Failed to load quote. Please try again later."`;
+//                 document.getElementById("quote-author").innerText = "";
+//             }
+//         }
+
+//         // Fetch new quote every 50 seconds
+//         setInterval(fetchQuote, 300000);
+//         fetchQuote();
+
+</script>
+
+</body>
+</html>
